@@ -1,64 +1,97 @@
+# Internal dependencies
+from db_irsol.api_gateway.default_gateway import DefaultGateway
+from db_irsol.api_gateway.authenticate_gateway import AuthenticateGateway
+from db_irsol.parsers.measurement_parser import MeasurementParser
+from db_irsol.settings import Settings
+from db_irsol.entities.utility import unzip_file
+from db_irsol.entities.default_entity import DefaultEntity
+
+# libraries dependencies
+import os
+from multiprocessing.pool import ThreadPool as Pool
+from multiprocessing import cpu_count
 
 
 class Measurement:
 
-    def __init__(self):
-        self.parameters = dict()
-        self.__gateway = default_gateway.DefaultGateway("Measurement")
+    @staticmethod
+    def get_measurement_from_z3bd_file(measurement_file_path, default_gateway=None):
 
-    def load_measurement_from_id(self, id_measurement):
-        self.parameters = self.__gateway.get_by_id(id_measurement)
+        file_path = measurement_file_path
 
-    def load_measurement_from_data(self, parameters):
-        self.parameters = parameters
+        if ".gz" in measurement_file_path:
+            file_path = unzip_file(measurement_file_path)
 
-    def load_measurement_from_dir(self, directory_measurement_path):
-        self.parameters = Measurement.get_measurements_from_dir(directory_measurement_path).parameters
+        parameters = MeasurementParser.parse_z3db_file(file_path)
 
-    def insert(self, id_observation):
-        result = False
+        path_split = measurement_file_path.split(".")
+        path_split.pop()
+        parameters["name"] = os.path.basename(os.path.normpath(''.join(path_split).replace("_mmd", "")))
 
-        if 'id_measurement' not in self.parameters.keys():
-            self.parameters['fk_observation'] = id_observation
+        measurement = DefaultEntity(default_gateway if default_gateway is not None and
+                                                       default_gateway.get_entry_point() == "Measurement.php" else None)
+        measurement.set_parameters(parameters)
 
-            result = self.__gateway.insert(self.parameters)
+        if ".gz" in measurement_file_path:
+            os.remove(file_path)
 
-        return result
-
-    def update(self):
-        result = False
-
-        if 'id_measurement' in self.parameters.keys():
-            body = copy.deepcopy(self.parameters)
-            id_record = body.pop('id_measurement', None)
-
-            result = self.__gateway.update(id_record, body)
-
-        return result
-
-    def delete(self):
-        result = False
-
-        if 'id_measurement' in self.parameters.keys():
-            result = self.__gateway.delete(self.parameters['id_measurement'])
-
-        return result
-
-    # Utility Methods
+        return measurement
 
     @staticmethod
-    def get_measurements_from_dir(directory_measurement_path, only_mmd_file=False):
+    def get_measurement_from_fits_file(measurement_file_path, default_gateway=None):
+
+        file_path = measurement_file_path
+
+        if ".gz" in measurement_file_path:
+            file_path = unzip_file(measurement_file_path)
+
+        parameters = MeasurementParser.parse_fits_file(file_path)
+
+        path_split = measurement_file_path.split(".")
+        path_split.pop()
+        parameters["name"] = os.path.basename(os.path.normpath(''.join(path_split)))
+
+        measurement = DefaultEntity(default_gateway if default_gateway is not None and
+                                                       default_gateway.get_entry_point() == "Measurement.php" else None)
+        measurement.set_parameters(parameters)
+
+        if ".gz" in measurement_file_path:
+            os.remove(file_path)
+
+        return measurement
+
+    @staticmethod
+    def get_measurements_from_observation_id(id_observation, default_gateway=None):
+
+        measurements = set()
+        measurement_gateway = DefaultGateway("Measurement.php", AuthenticateGateway(Settings.AUTHENTICATE_USERNAME,
+                                                                                    Settings.AUTHENTICATE_PASSWORD))
+
+        results = measurement_gateway.get_by_parameters({"fk_observation": id_observation})
+
+        if results is not None:
+            for measurement_parameters in results:
+                measurement = DefaultEntity(default_gateway)
+                measurement.set_parameters(measurement_parameters, True)
+                measurements.add(measurement)
+
+        return measurements
+
+    @staticmethod
+    def get_measurements_from_dir(directory_measurement_path, only_mmd_file=False, default_gateway=None):
+
+        print(default_gateway)
 
         measurements_z3bd_files = []
         measurements_fits_files = []
-        measurements = []
+        measurements = set()
 
         for root, directories, files in os.walk(directory_measurement_path):
             for file in files:
                 # Path of the measurement
                 measurement_file_path = os.path.join(root, file)
                 # Check if the measurement contains a ignore keyword in the name
-                if not any(substring in file for substring in constant.MEASUREMENTS_IGNORE_KEYS_WORDS):
+                if not any(substring in file for substring in Settings.measurements_ignore_keys_words):
                     if ".z3bd" in file:
                         if only_mmd_file and "_mmd" in file:
                             measurements_z3bd_files.append(measurement_file_path)
@@ -67,56 +100,19 @@ class Measurement:
                     elif ".fits" in file:
                         measurements_fits_files.append(measurement_file_path)
 
+        pool = Pool(cpu_count())
+
+        print(measurements_z3bd_files)
+
         for measurement in measurements_z3bd_files:
-            measurements.append(Measurement.get_measurement_from_z3bd_file(measurement))
+            pool.apply_async(Measurement.get_measurement_from_z3bd_file, (measurement, default_gateway,),
+                             callback=measurements.add)
 
         for measurement in measurements_fits_files:
-            measurements.append(Measurement.get_measurement_from_fits_file(measurement))
+            pool.apply_async(Measurement.get_measurement_from_fits_file, (measurement, default_gateway),
+                             callback=measurements.add)
 
-        return measurements
-
-    @staticmethod
-    def get_measurement_from_z3bd_file(measurement_file_path):
-
-        file_path = measurement_file_path
-        if ".gz" in measurement_file_path:
-            file_path = unzip_file(measurement_file_path)
-
-        measurement = Measurement()
-        measurement.parameters = parsers.Parser.parse_measure_z3db_file(file_path)
-
-        measurement.parameters["name"] = os.path.basename(os.path.normpath(file_path.split(".")[0].replace("_mmd", "")))
-
-        if ".gz" in measurement_file_path:
-            os.remove(file_path)
-
-        return measurement
-
-    @staticmethod
-    def get_measurement_from_fits_file(measurement_file_path):
-
-        file_path = measurement_file_path
-        if ".gz" in measurement_file_path:
-            file_path = unzip_file(measurement_file_path)
-
-        measurement = Measurement()
-        measurement.parameters = parsers.Parser.parse_measure_fits_file(file_path)
-
-        measurement.parameters["name"] = os.path.basename(os.path.normpath(file_path.replace(".fits", "")))
-
-        if ".gz" in measurement_file_path:
-            os.remove(file_path)
-
-        return measurement
-
-    @staticmethod
-    def get_measurements_from_observation_id(id_observation):
-        measurements = []
-        measurement_gateway = default_gateway.DefaultGateway("Measurement")
-        results = measurement_gateway.get_by_parameters({"fk_observation": id_observation})
-        for measurement_parameters in results:
-            observation_measurement = Measurement()
-            observation_measurement.load_measurement_from_data(measurement_parameters)
-            measurements.append(observation_measurement)
+        pool.close()
+        pool.join()
 
         return measurements

@@ -1,5 +1,5 @@
-# Internal package dependencies
-import db_irsol.api_gateway.constants as constants
+# Internal dependencies
+from db_irsol.settings import Settings
 
 # libraries dependencies
 import requests
@@ -12,162 +12,219 @@ class DefaultGateway:
         self.__entry_point = entry_point
         self.consider_deleted_record = False
         self.consider_modified_record = False
-        self.authenticateGateway = authenticate_gateway
+        self.authenticate_gateway = authenticate_gateway
+
+    def get_entry_point(self):
+        return self.__entry_point
 
     # GET METHODS
 
-    def get_info_table_columns(self):
-        payload = {'get_info_table_columns': ""}
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.get(constants.API_URL + "/" + self.__entry_point, params=payload, json=body_data)
-
+    def generic_get_request(self, params):
         result = None
 
-        if request.ok:
+        if self.authenticate_gateway is None:
+            print("authenticate gateway is none. Not possible to authenticate on the server.")
+            return result
+
+        if self.authenticate_gateway.get_token() is None:
+            print("token is none. The authenticate gateway can provide a token. Check the credentials in it.")
+            return result
+
+        body_data = {'auth_token': self.authenticate_gateway.get_token()} if self.authenticate_gateway is not None else {}
+
+        # try to perform the request
+        try:
+            request = requests.get(Settings.api_url + "/" + self.__entry_point, params=params, json=body_data)
+
             # Convert string to list.
-            result = json.loads(request.text[1:-1])
+            parsed_result = json.loads(request.text[1:-1])
+
+            if request.ok:
+                result = parsed_result
+            elif 'error' in parsed_result:
+                print('Error arise: ' + parsed_result['error'])
+
+        except requests.exceptions.ConnectionError:
+            print("Connection to server "
+                  + Settings.api_url
+                  + " failed. Please check if the server is working or if you have internet connection.")
+        except requests.exceptions.Timeout:
+            print("Request timeout. Maybe set up for a retry, or continue in a retry loop.")
+        except requests.exceptions.TooManyRedirects:
+            print("Bad URL (" + Settings.api_url + "). Try a different one")
+        except requests.exceptions.RequestException as e:
+            print("Some error occur: \n" + str(e))
+        except json.decoder.JSONDecodeError as e:
+            print("There was a problem accessing the response: \n" + str(e))
 
         return result
+
+    def get_info_table_columns(self):
+        payload = {'get_info_table_columns': ""}
+        return self.generic_get_request(payload)
 
     def get_table_columns_names(self):
         payload = {'get_table_columns_names': ""}
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.get(constants.API_URL + "/" + self.__entry_point, params=payload, json=body_data)
-
-        result = None
-
-        if request.ok:
-            # Convert string to list.
-            result = json.loads(request.text[1:-1])
-
-        return result
+        return self.generic_get_request(payload)
 
     def get_info_table_not_null_columns(self):
         payload = {'get_info_table_not_null_columns': ""}
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.get(constants.API_URL + "/" + self.__entry_point, params=payload, json=body_data)
-
-        result = None
-
-        if request.ok:
-            # Convert string to list.
-            result = json.loads(request.text[1:-1])
-
-        return result
+        return self.generic_get_request(payload)
 
     def get_table_not_null_columns_names(self):
         payload = {'get_table_not_null_columns_names': ""}
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.get(constants.API_URL + "/" + self.__entry_point, params=payload, json=body_data)
+        return self.generic_get_request(payload)
 
-        result = None
-
-        if request.ok:
-            # Convert string to list.
-            result = json.loads(request.text[1:-1])
-
-        return result
+    def get_table_column_id_name(self):
+        payload = {'get_table_column_id_name': ""}
+        return self.generic_get_request(payload)
 
     def get_number_of_elements(self):
         payload = {'get_number_of_elements': ""}
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.get(constants.API_URL + "/" + self.__entry_point, params=payload, json=body_data)
-
-        result = None
-
-        if request.ok:
-            # Convert string to list.
-            result = json.loads(request.text[1:-1])
-
-        return result
+        return self.generic_get_request(payload)
 
     def get_by_id(self, id_record):
         payload = {'id': id_record}
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.get(constants.API_URL + "/" + self.__entry_point, params=payload, json=body_data)
-
-        record = None
-        if request.ok:
-            # Return a list of records. Because the id is unique take the first one
-            record = json.loads(request.text[1:-1])[0]
-
-        return record
+        return self.generic_get_request(payload)
 
     def get_chunk(self, start_element_number, number_of_elements):
         payload = {'start_element_number': start_element_number, 'number_of_elements': number_of_elements}
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.get(constants.API_URL + "/" + self.__entry_point, params=payload, json=body_data)
-
-        records = None
-
-        if request.ok:
-            # Return a list of records.
-            records = json.loads(request.text[1:-1])
-
-        return records
+        return self.generic_get_request(payload)
 
     def get_by_parameters(self, columns_value_dict):
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.get(constants.API_URL + "/" + self.__entry_point, params=columns_value_dict, json=body_data)
-
-        records = None
-
-        if request.ok:
-            # Return a list of records.
-            records = json.loads(request.text[1:-1])
-
-        return records
+        return self.generic_get_request(columns_value_dict)
 
     def get_chunk_by_parameters(self,  start_element_number, number_of_elements, columns_value_dict):
         columns_value_dict['start_element_number'] = start_element_number
         columns_value_dict['number_of_elements'] = number_of_elements
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.get(constants.API_URL + "/" + self.__entry_point, params=columns_value_dict, json=body_data)
-
-        records = None
-        print(request.url)
-
-        if request.ok:
-            # Return a list of records.
-            records = json.loads(request.text[1:-1])
-
-        return records
+        return self.generic_get_request(columns_value_dict)
 
     # POST METHODS
 
     def insert(self, columns_value_dict):
-        auth_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        body_data = {**columns_value_dict, **auth_data}
-        request = requests.post(constants.API_URL + "/" + self.__entry_point, json=body_data)
-
         result = None
 
-        if request.ok:
-            # Return a list of records.
-            result = int(request.text.replace("\"", ""))
+        if self.authenticate_gateway is None:
+            print("authenticate gateway is none. Not possible to authenticate on the server.")
+            return result
+
+        if self.authenticate_gateway.get_token() is None:
+            print("token is none. The authenticate gateway can provide a token. Check the credentials in it.")
+            return result
+
+        auth_data = {'auth_token': self.authenticate_gateway.get_token()} if self.authenticate_gateway is not None else {}
+        body_data = {**columns_value_dict, **auth_data}
+
+        # try to perform the request
+        try:
+            request = requests.post(Settings.api_url + "/" + self.__entry_point, json=body_data)
+
+            if request.ok:
+                result = int(request.text.replace("\"", ""))
+            else:
+                # Convert string to list.
+                parsed_result = json.loads(request.text[1:-1])
+                if 'error' in parsed_result:
+                    print('Error arise: ' + str(parsed_result['error']))
+
+        except requests.exceptions.ConnectionError:
+            print("Connection to server "
+                  + Settings.api_url
+                  + " failed. Please check if the server is working or if you have internet connection.")
+        except requests.exceptions.Timeout:
+            print("Request timeout. Maybe set up for a retry, or continue in a retry loop.")
+        except requests.exceptions.TooManyRedirects:
+            print("Bad URL (" + Settings.api_url + "). Try a different one")
+        except requests.exceptions.RequestException as e:
+            print("Some error occur: \n" + str(e))
+        except json.decoder.JSONDecodeError as e:
+            print("There was a problem accessing the response: \n" + str(e))
 
         return result
 
     # PUT METHODS
 
     def update(self, id_record, columns_value_dict):
-        payload = {'id': id_record}
-        auth_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        body_data = {**columns_value_dict, **auth_data}
-        request = requests.put(constants.API_URL + "/" + self.__entry_point, json=body_data, params=payload)
-
         result = None
-        if request.ok:
-            # Return a list of records.
-            result = int(request.text.replace("\"", ""))
+
+        if self.authenticate_gateway is None:
+            print("authenticate gateway is none. Not possible to authenticate on the server.")
+            return result
+
+        if self.authenticate_gateway.get_token() is None:
+            print("token is none. The authenticate gateway can provide a token. Check the credentials in it.")
+            return result
+
+        payload = {'id': id_record}
+        auth_data = {'auth_token': self.authenticate_gateway.get_token()} if self.authenticate_gateway is not None else {}
+        body_data = {**columns_value_dict, **auth_data}
+
+        # try to perform the request
+        try:
+            request = requests.put(Settings.api_url + "/" + self.__entry_point, json=body_data, params=payload)
+
+            if request.ok:
+                result = int(request.text.replace("\"", ""))
+            else:
+                # Convert string to list.
+                parsed_result = json.loads(request.text[1:-1])
+                if 'error' in parsed_result:
+                    print('Error arise: ' + parsed_result['error'])
+
+        except requests.exceptions.ConnectionError:
+            print("Connection to server "
+                  + Settings.api_url
+                  + " failed. Please check if the server is working or if you have internet connection.")
+        except requests.exceptions.Timeout:
+            print("Request timeout. Maybe set up for a retry, or continue in a retry loop.")
+        except requests.exceptions.TooManyRedirects:
+            print("Bad URL (" + Settings.api_url + "). Try a different one")
+        except requests.exceptions.RequestException as e:
+            print("Some error occur: \n" + str(e))
+        except json.decoder.JSONDecodeError as e:
+            print("There was a problem accessing the response: \n" + str(e))
 
         return result
 
     # DELETE METHODS
 
     def delete(self, id_record):
-        payload = {'id': id_record}
-        body_data = {'auth_token': self.authenticateGateway.get_token()} if self.authenticateGateway is not None else {}
-        request = requests.delete(constants.API_URL + "/" + self.__entry_point, params=payload, json=body_data)
+        result = False
 
-        return request.ok
+        if self.authenticate_gateway is None:
+            print("authenticate gateway is none. Not possible to authenticate on the server.")
+            return result
+
+        if self.authenticate_gateway.get_token() is None:
+            print("token is none. The authenticate gateway can provide a token. Check the credentials in it.")
+            return result
+
+        payload = {'id': id_record}
+        body_data = {'auth_token': self.authenticate_gateway.get_token()} if self.authenticate_gateway is not None else {}
+
+        # try to perform the request
+        try:
+            request = requests.delete(Settings.api_url + "/" + self.__entry_point, params=payload, json=body_data)
+
+            if request.ok:
+                result = True
+            else:
+                # Convert string to list.
+                parsed_result = json.loads(request.text[1:-1])
+                if 'error' in parsed_result:
+                    print('Error arise: ' + parsed_result['error'])
+
+        except requests.exceptions.ConnectionError:
+            print("Connection to server "
+                  + Settings.api_url
+                  + " failed. Please check if the server is working or if you have internet connection.")
+        except requests.exceptions.Timeout:
+            print("Request timeout. Maybe set up for a retry, or continue in a retry loop.")
+        except requests.exceptions.TooManyRedirects:
+            print("Bad URL (" + Settings.api_url + "). Try a different one")
+        except requests.exceptions.RequestException as e:
+            print("Some error occur: \n" + str(e))
+        except json.decoder.JSONDecodeError as e:
+            print("There was a problem accessing the response: \n" + str(e))
+
+        return result
