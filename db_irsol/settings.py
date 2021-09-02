@@ -1,32 +1,51 @@
 
 
 class Settings:
+    """ This class contains all the settings needed for the db_irsol package to work.
+        Some settings can be changed, others cannot.
 
-    # Authentication data.
-    # Only have the possibility to see the data not to create.
-    AUTHENTICATE_USERNAME = 'db_irsol_client'
-    AUTHENTICATE_PASSWORD = 'U{4ZA;Z<j]rYH~2`'
+    :param AUTH_USERNAME: The user name of the standard user.
+        This user only has permission to view all data except the other users data.
+    :type AUTH_USERNAME: str, constant
+    :param AUTH_PASSWORD: The password of the standard user.
+        This user only has permission to view all data except the other users data.
+    :type AUTH_PASSWORD: str, constant
+    :param keywords_to_ignore_measurements: List of keywords that can be contained in the names of the measurements.
+        If the name of a measurement contains one or more of these keywords, the measurement is ignored.
+        The default values are "dark" and "cal".
+    :type keywords_to_ignore_measurements: list
+    :param api_url: The URL where the REST API service of the IRSOL database can be reached.
+    :type api_url: str
+    :param token_timestamp_expiration_security: The number is used as time range to check if the expire time
+        of a token is close. If the time of expire is more close than the time defined by this variable the token is
+        regenerate. The set number represents a time range in seconds.
+    :type token_timestamp_expiration_security: int
+    :param FIELDS_NAMES_Z3BD_FILE_TO_DATABASE_COLUMNS_NAMES: It define the fields that need to be taken from
+        a .z3db measurement file. The keys are the fields names that can be present in a measurement file.
+        While the values are the respective column names in the database.
+    :type FIELDS_NAMES_Z3BD_FILE_TO_DATABASE_COLUMNS_NAMES: dict, constant
+    :param FIELDS_NAMES_FITS_FILE_TO_DATABASE_COLUMNS_NAMES: It define the fields that need to be taken from
+        a .fits measurement file. The keys are the fields names that can be present in a measurement file.
+        While the values are the respective column names in the database.
+    :type FIELDS_NAMES_FITS_FILE_TO_DATABASE_COLUMNS_NAMES: dict, constant
+    :param ENTRY_POINTS: List of entry points provide by the REST API service. Each entry point is the name of
+        the file .php, present on the server, that processes a specific set of requests. The requests are divided
+        in set based on the entity (Observation, Measurement, Telescope, ...) they will work with.
+    :type ENTRY_POINTS: list, constant
+    """
 
-    # This variable is use by the entities
-    # This variable tells which measurements to ignore and which not.
-    # This list can contains only part of the names of the measurements.
-    # The filter on which measurements to ignore is done on their names.
-    measurements_ignore_keys_words = [
+    AUTH_USERNAME = 'db_irsol_client'
+    AUTH_PASSWORD = 'U{4ZA;Z<j]rYH~2`'
+
+    keywords_to_ignore_measurements = [
         'cal',
         'dark'
     ]
 
-    # This variables are use by the gateways
-    # URL of the server. The entry point is always the api folder.
     api_url = "http://localhost/api"
-    # The following variable is used to check the duration of the token.
-    # The time defined by the following variable is used as range to tell if the expire time of a token is close.
-    # If the time of expire is more close than the time defined by the following constant the token is regenerate.
+
     token_timestamp_expiration_security = 10
 
-    # This variables are use by the parsers
-    # They define the fields that need to be taken from the measurements files.
-    # Each fields name has its corresponding column name in the database.
     FIELDS_NAMES_Z3BD_FILE_TO_DATABASE_COLUMNS_NAMES = {
         'CAM_IT': 'cam_it',
         'CAM_TC': 'cam_tc',
@@ -56,5 +75,4 @@ class Settings:
         'TELESCOP': 'fk_telescope-name'
     }
 
-    # The following list contains all the entry points present on the server.
     ENTRY_POINTS = ["Observation.php", "Measurement.php"]

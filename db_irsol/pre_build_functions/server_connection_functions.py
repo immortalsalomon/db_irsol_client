@@ -4,7 +4,7 @@ from db_irsol.api_gateway.default_gateway import DefaultGateway
 from db_irsol.api_gateway.gateway_manager import GatewayManager
 
 
-class ServerConnection:
+class ServerConnectionFunctions:
 
     ###########################################
     ### Pre build function for authenticate ###
