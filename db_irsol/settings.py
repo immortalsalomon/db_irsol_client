@@ -16,10 +16,10 @@ class Settings:
     :type keywords_to_ignore_measurements: list
     :param api_url: The URL where the REST API service of the IRSOL database can be reached.
     :type api_url: str
-    :param token_timestamp_expiration_security: The number is used as time range to check if the expire time
+    :param TOKEN_TIMESTAMP_EXPIRATION_SECURITY: The number is used as time range to check if the expire time
         of a token is close. If the time of expire is more close than the time defined by this variable the token is
         regenerate. The set number represents a time range in seconds.
-    :type token_timestamp_expiration_security: int
+    :type TOKEN_TIMESTAMP_EXPIRATION_SECURITY: int
     :param FIELDS_NAMES_Z3BD_FILE_TO_DATABASE_COLUMNS_NAMES: It define the fields that need to be taken from
         a .z3db measurement file. The keys are the fields names that can be present in a measurement file.
         While the values are the respective column names in the database.
@@ -43,8 +43,9 @@ class Settings:
     ]
 
     api_url = "https://db.irsol.ch/api"
+    #api_url = "http://localhost/api"
 
-    token_timestamp_expiration_security = 10
+    TOKEN_TIMESTAMP_EXPIRATION_SECURITY = 10
 
     FIELDS_NAMES_Z3BD_FILE_TO_DATABASE_COLUMNS_NAMES = {
         'CAM_IT': 'cam_it',
@@ -75,4 +76,6 @@ class Settings:
         'TELESCOP': 'fk_telescope-name'
     }
 
-    ENTRY_POINTS = ["Observation.php", "Measurement.php"]
+    ENTRY_POINTS = ["Observation.php", "Measurement.php", "Telescope.php", "PFInstrument.php", "Optic.php",
+                    "Modulator.php", "Instrument.php"]
+    # Need to fix user entry point

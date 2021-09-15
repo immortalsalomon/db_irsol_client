@@ -33,7 +33,9 @@ class GatewayManager:
         self.__password = None
         self.__authenticate_gateway = None
         self.__is_authentication_working = False
-        self.set_credentials(username, password)
+
+        if username is not None and password is not None and username != "" and password != "":
+            self.set_credentials(username, password)
 
         self.__default_gateways = {}
         if entry_points is not None:

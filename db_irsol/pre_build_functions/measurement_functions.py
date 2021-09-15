@@ -7,8 +7,6 @@ from db_irsol.settings import Settings
 
 # libraries dependencies
 import os
-from multiprocessing.pool import ThreadPool as Pool
-from multiprocessing import cpu_count
 import copy
 
 
@@ -95,13 +93,29 @@ class MeasurementFunctions:
     ### Pre build functions to retrieve Measurement  ###
     ####################################################
 
+    @staticmethod
+    def get_measurement_from_file(measurement_file_path):
+
+        measurement = None
+
+        if not os.path.exists(measurement_file_path):
+            print("The measurement file path doesn't exists. Please provide a valid path.")
+        elif "z3bd" in measurement_file_path:
+            measurement = EntityManager.get_measurement_from_z3bd_file(measurement_file_path)
+        elif "fits" in measurement_file_path:
+            measurement = EntityManager.get_measurement_from_fits_file(measurement_file_path)
+        else:
+            print("The format of the measurement file is not supported. Please provide z3bd or fits file. ")
+
+        return measurement
+
     # This function returns measurements from the passed folder.
     @staticmethod
     def get_measurements_from_dir(dir_path):
         measurements = None
 
         if not os.path.exists(dir_path):
-            print("dir not found.")
+            print("Measurement dir not found.")
         else:
             measurements = EntityManager.get_measurements_from_dir(dir_path)
 
@@ -115,10 +129,12 @@ class MeasurementFunctions:
 
         if not isinstance(dirs_path, list):
             print("The dirs_path is not a list of directory path.")
+        if not all(os.path.exists(measurement_path) for measurement_path in dirs_path):
+            print("One or more path defined inside the dirs_path parameters don't exist.")
         else:
-            measurements = {}
+            measurements = set()
             for dir_path in dirs_path:
-                measurements[dir_path] = MeasurementFunctions.get_measurements_from_dir(dir_path)
+                measurements = measurements.union(MeasurementFunctions.get_measurements_from_dir(dir_path))
 
         return measurements
 
@@ -223,3 +239,302 @@ class MeasurementFunctions:
                                                                                     parameters, 'Measurement.php')
 
         return to_return
+
+    ##################################################
+    ### Pre build functions to insert Measurement  ###
+    ##################################################
+
+    # This function adds the passed observation in the database, if it is not already present.
+    @staticmethod
+    def insert_measurement_on_server(measurement, gateway_manager):
+        result = None
+
+        if not isinstance(gateway_manager, GatewayManager):
+            print("You need to provide a gateway_manager to connect with the service REST API.")
+        elif not isinstance(measurement, DefaultEntity):
+            print("You need to provide a valid measurement. Measurement parameter is an DefaultEntity object.")
+        else:
+            entity_manager = EntityManager(gateway_manager)
+            result = entity_manager.insert(measurement)
+
+        return result
+
+    # This function adds the passed observations in the database, if it is not already present.
+    @staticmethod
+    def insert_measurements_on_server(measurements, gateway_manager):
+        results = None
+
+        if not isinstance(measurements, set) and not isinstance(measurements, list):
+            print("The measurements parameter is not a list or a set.")
+        else:
+            results = {}
+            for measurement in measurements:
+                result = MeasurementFunctions.insert_measurement_on_server(measurement, gateway_manager)
+                results[hash(measurement)] = result
+
+        return results
+
+    @staticmethod
+    def insert_measurement_on_server_from_file(measurement_file_path, id_observation, gateway_manager):
+
+        result = None
+
+        if not isinstance(id_observation, int):
+            print("The parameter id_observation is not a number.")
+        else:
+            measurement = MeasurementFunctions.get_measurement_from_file(measurement_file_path)
+
+            if measurement is not None:
+                measurement.add_parameters({"fk_observation": id_observation})
+                result = MeasurementFunctions.insert_measurement_on_server(measurement, gateway_manager)
+
+        return result
+
+    # This function allows to insert in the database an observation from the passed folder,
+    # if it is not already present.
+    @staticmethod
+    def insert_measurements_on_server_from_dir(measurements_dir_path, id_observation, gateway_manager):
+
+        result = None
+
+        if not isinstance(id_observation, int):
+            print("The parameter id_observation is not a number.")
+        if not os.path.exists(measurements_dir_path):
+            print("The parameter measurements_dir_path doesn't contain a valid path.")
+        else:
+            measurements = MeasurementFunctions.get_measurements_from_dir(measurements_dir_path)
+
+            for measurement in measurements:
+                measurement.add_parameters({"fk_observation": id_observation})
+
+            result = MeasurementFunctions.insert_measurements_on_server(measurements, gateway_manager)
+
+        return result
+
+    # This function allows to insert on the server the observations present in the passed folder,
+    # if they are not present on the server.
+    @staticmethod
+    def insert_measurements_on_server_from_dirs(measurements_dirs_paths, id_observation, gateway_manager):
+
+        if not isinstance(id_observation, int):
+            print("The parameter id_observation is not a number.")
+        else:
+
+            measurements = MeasurementFunctions.get_measurements_from_dirs(measurements_dirs_paths)
+
+            for measurement in measurements:
+                measurement.add_parameters({"fk_observation": id_observation})
+
+            result = MeasurementFunctions.insert_measurements_on_server(measurements, gateway_manager)
+
+        return result
+
+    # This function allows to insert on the server an observation and its measurements,
+    # if they are not present on the server.
+    @staticmethod
+    def insert_observation_and_measurements_on_server(observation, measurements, gateway_manager):
+        return ObservationFunctions.insert_observation_and_measurements_on_server(observation, measurements,
+                                                                                  gateway_manager)
+
+    # This function allows to insert on the server some observations and theirs measurements,
+    # if they are not present on the server.
+    @staticmethod
+    def insert_observations_and_measurements_on_server(observations, measurements, gateway_manager):
+        return ObservationFunctions.insert_observations_and_measurements_on_server(observations, measurements,
+                                                                                   gateway_manager)
+
+    # This function allows to insert on the server an observation and their measurements
+    # present in the passed folder, if they are not present on the server.
+    @staticmethod
+    def insert_observation_and_measurements_on_server_from_dir(observation_dir_path, gateway_manager):
+        return ObservationFunctions.insert_observation_and_measurements_on_server_from_dir(observation_dir_path,
+                                                                                           gateway_manager)
+
+    # This function allows to insert on the server some observations and their measurements
+    # present in the passed folder, if they are not present on the server.
+    @staticmethod
+    def insert_observations_and_measurements_on_server_from_dir(observations_dir_path, gateway_manager):
+        return ObservationFunctions.insert_observations_and_measurements_on_server_from_dir(observations_dir_path,
+                                                                                            gateway_manager)
+
+    ##################################################
+    ### Pre build functions to update Measurement  ###
+    ##################################################
+
+    # This function adds the passed observation in the database, if it is not already present.
+    @staticmethod
+    def update_measurement_on_server(measurement, parameters_to_update, gateway_manager):
+        result = None
+
+        if not isinstance(gateway_manager, GatewayManager):
+            print("You need to provide a gateway_manager to connect with the service REST API.")
+        elif not isinstance(measurement, DefaultEntity):
+            print("You need to provide a valid measurement. Measurement parameter is an DefaultEntity object.")
+        elif parameters_to_update is None:
+            print("The parameters_to_update parameter is None.")
+        elif not isinstance(parameters_to_update, dict):
+            print("The parameter parameters_to_update need to be a dictionary.")
+        else:
+            entity_manager = EntityManager(gateway_manager)
+
+            if not measurement.is_entity_synchronized_with_server():
+                entity_manager.synchronize_entity_with_server(measurement)
+
+            if measurement.is_entity_synchronized_with_server():
+                result = entity_manager.update(measurement, parameters_to_update)
+
+        return result
+
+    # This function adds the passed observations in the database, if it is not already present.
+    @staticmethod
+    def update_measurements_on_server(measurements, parameters_to_update, gateway_manager):
+        result = None
+
+        if measurements is None:
+            print("The measurements parameter is None.")
+        if not isinstance(measurements, set) and not isinstance(measurements, list):
+            print("The parameter measurements need to be a list or a set.")
+        if not all(isinstance(measurement, DefaultEntity) for measurement in measurements):
+            print("Not all measurements in the measurements set/list are instance of the DefaultEntity class.")
+        elif parameters_to_update is None:
+            print("The parameters_to_update parameter is None.")
+        elif not isinstance(parameters_to_update, dict):
+            print("The parameter parameters_to_update need to be a dictionary.")
+        if not all(isinstance(parameters, dict) for parameters in parameters_to_update.values()):
+            print("Not all the value of the parameter parameters_to_update are dictionary.")
+        else:
+            result = {}
+            for measurement in measurements:
+                if hash(measurement) in parameters_to_update:
+                    result[hash(measurement)] = MeasurementFunctions.update_measurement_on_server(
+                        measurement, parameters_to_update[hash(measurement)], gateway_manager)
+
+        return result
+
+    @staticmethod
+    def update_measurement_on_server_from_file(measurement_file_path, gateway_manager):
+
+        result = None
+
+        if not os.path.exists(measurement_file_path):
+            print("The parameter measurement_file_path doesn't contain a valid path.")
+        else:
+            measurement = MeasurementFunctions.get_measurement_from_file(measurement_file_path)
+            parameters_to_update = copy.deepcopy(measurement.get_parameters())
+
+            result = MeasurementFunctions.update_measurement_on_server(measurement, parameters_to_update,
+                                                                       gateway_manager)
+
+        return result
+
+    # This function allows to insert in the database an observation from the passed folder,
+    # if it is not already present.
+    @staticmethod
+    def update_measurements_on_server_from_dir(measurements_dir_path, gateway_manager):
+
+        result = None
+
+        measurements = MeasurementFunctions.get_measurements_from_dirs(measurements_dir_path)
+
+        if not isinstance(measurements, set) and not isinstance(measurements, list):
+            print("Can't find measurements in the passed folder.")
+        else:
+            parameters_to_update = {}
+
+            for measurement in measurements:
+                parameters_to_update[hash(measurement)] = copy.deepcopy(measurement.get_parameters())
+
+            result = MeasurementFunctions.update_measurements_on_server(measurements, parameters_to_update,
+                                                                        gateway_manager)
+
+        return result
+
+    # This function allows to insert on the server the observations present in the passed folder,
+    # if they are not present on the server.
+    @staticmethod
+    def update_measurements_on_server_from_dirs(observations_dirs_paths, gateway_manager):
+
+        result = None
+
+        measurements = MeasurementFunctions.get_measurements_from_dirs(observations_dirs_paths)
+
+        if not isinstance(measurements, set) and not isinstance(measurements, list):
+            print("Can't find any measurements in the passed directory.")
+        else:
+            parameters_to_update = {}
+
+            for measurement in measurements:
+                parameters_to_update[hash(measurement)] = copy.deepcopy(measurement.get_parameters())
+
+            result = MeasurementFunctions.update_measurements_on_server(measurements, parameters_to_update,
+                                                                        gateway_manager)
+
+        return result
+
+    ##################################################
+    ### Pre build functions to delete Measurement  ###
+    ##################################################
+
+    # This function adds the passed observation in the database, if it is not already present.
+    @staticmethod
+    def delete_measurement_on_server(measurement, gateway_manager):
+        result = False
+
+        if not isinstance(gateway_manager, GatewayManager):
+            print("You need to provide a gateway_manager to connect with the service REST API.")
+        elif not isinstance(measurement, DefaultEntity):
+            print("You need to provide a valid measurement. Measurement parameter is an DefaultEntity object.")
+        else:
+            entity_manager = EntityManager(gateway_manager)
+
+            if not measurement.is_entity_synchronized_with_server():
+                entity_manager.synchronize_entity_with_server(measurement)
+
+            if measurement.is_entity_synchronized_with_server():
+                result = entity_manager.delete(measurement)
+
+        return result
+
+    # This function adds the passed observations in the database, if it is not already present.
+    @staticmethod
+    def delete_measurements_on_server(measurements, gateway_manager):
+        result = None
+
+        if not isinstance(measurements, set) and not isinstance(measurements, list):
+            print("The parameter measurements need to be a set or a list.")
+        if not all(isinstance(measurement, DefaultEntity) for measurement in measurements):
+            print("Not all the measurements in measurements parameter are instance of the class DefaultEntity.")
+        else:
+            result = {}
+            for measurement in measurements:
+                result[hash(measurement)] = MeasurementFunctions.delete_measurement_on_server(measurement,
+                                                                                              gateway_manager)
+        return result
+
+    @staticmethod
+    def delete_measurement_on_server_from_file(measurement_file_path, gateway_manager):
+
+        measurement = MeasurementFunctions.get_measurement_from_file(measurement_file_path)
+        result = MeasurementFunctions.delete_measurement_on_server(measurement, gateway_manager)
+
+        return result
+
+    # This function allows to insert in the database an observation from the passed folder,
+    # if it is not already present.
+    @staticmethod
+    def delete_measurements_on_server_from_dir(measurements_dir_path, gateway_manager):
+
+        measurements = MeasurementFunctions.get_measurements_from_dir(measurements_dir_path)
+        result = MeasurementFunctions.delete_measurements_on_server(measurements, gateway_manager)
+
+        return result
+
+    # This function allows to insert on the server the observations present in the passed folder,
+    # if they are not present on the server.
+    @staticmethod
+    def delete_measurements_on_server_from_dirs(observations_dirs_paths, gateway_manager):
+
+        measurements = MeasurementFunctions.get_measurements_from_dirs(observations_dirs_paths)
+        result = MeasurementFunctions.delete_measurements_on_server(measurements, gateway_manager)
+
+        return result

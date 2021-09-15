@@ -51,7 +51,7 @@ class AuthenticateGateway:
         :rtype: str
         """
         if self.__token is not None and \
-                time.time() >= self.__token_expiration_time + Settings.token_timestamp_expiration_security:
+                time.time() >= self.__token_expiration_time + Settings.TOKEN_TIMESTAMP_EXPIRATION_SECURITY:
             self.__token = self.generate_token()
 
             if self.__token is not None:

@@ -252,8 +252,8 @@ class ObservationFunctions:
     def insert_observations_on_server(observations, gateway_manager):
         results = None
 
-        if observations is None:
-            print("The observations parameter is None.")
+        if not isinstance(observations, set) and not isinstance(observations, list):
+            print("The observations parameter is not a list or a set.")
         else:
             results = {}
             for observation in observations:
@@ -266,7 +266,6 @@ class ObservationFunctions:
     # if it is not already present.
     @staticmethod
     def insert_observation_on_server_from_dir(observation_dir_path, gateway_manager):
-        result = None
 
         observation = ObservationFunctions.get_observation_from_dir(observation_dir_path)
         result = ObservationFunctions.insert_observation_on_server(observation, gateway_manager)
@@ -277,7 +276,6 @@ class ObservationFunctions:
     # if they are not present on the server.
     @staticmethod
     def insert_observations_on_server_from_dir(observations_dir_path, gateway_manager):
-        result = None
 
         observations = ObservationFunctions.get_observations_from_dir(observations_dir_path)
         result = ObservationFunctions.insert_observations_on_server(observations, gateway_manager)
@@ -293,13 +291,18 @@ class ObservationFunctions:
 
         result = ObservationFunctions.insert_observation_on_server(observation, gateway_manager)
 
-        if result is None:
+        if result is None and isinstance(observation, DefaultEntity):
             entity_manager.synchronize_entity_with_server(observation)
             if observation.is_entity_synchronized_with_server():
                 result = observation.get_parameters()['id_observation']
 
-        if result is not None and measurements is not None \
-                and all(isinstance(measurement, DefaultEntity) for measurement in measurements):
+        if result is None:
+            print("Can't add the observation and can't find the observation on the database.")
+        elif measurements is None:
+            print("The parameter measurements passed is None.")
+        elif not isinstance(measurements, list) and not isinstance(measurements, set):
+            print("The measurements parameter need to be a list or a set.")
+        elif all(isinstance(measurement, DefaultEntity) for measurement in measurements):
             pool = Pool(cpu_count())
             for measurement in measurements:
                 measurement.add_parameters({'fk_observation': result})
@@ -307,6 +310,8 @@ class ObservationFunctions:
 
             pool.close()
             pool.join()
+        else:
+            print("One or more measurement in the measurements are not instance of the class DefaultEntity.")
 
         return result
 
@@ -318,8 +323,12 @@ class ObservationFunctions:
 
         if observations is None:
             print("The observations parameter is None.")
+        if not isinstance(observations, list) and not isinstance(observations, set):
+            print("The observations parameter need to be a list or a set.")
         elif measurements is None:
             print("The measurements parameter is None.")
+        if not isinstance(measurements, dict):
+            print("The measurements parameter need to be a dictionary.")
         else:
             result = {}
             for observation in observations:
@@ -344,7 +353,6 @@ class ObservationFunctions:
     # present in the passed folder, if they are not present on the server.
     @staticmethod
     def insert_observations_and_measurements_on_server_from_dir(observations_dir_path, gateway_manager):
-        result = None
 
         observations, measurements = ObservationFunctions.get_observations_and_measurements_from_dir(
             observations_dir_path)
@@ -367,6 +375,8 @@ class ObservationFunctions:
             print("You need to provide a valid observation. Observation parameter is an DefaultEntity object.")
         elif parameters_to_update is None:
             print("The parameters_to_update parameter is None.")
+        elif not isinstance(parameters_to_update, dict):
+            print("The parameter parameters_to_update need to be a dictionary.")
         else:
             entity_manager = EntityManager(gateway_manager)
 
@@ -385,13 +395,22 @@ class ObservationFunctions:
 
         if observations is None:
             print("The observations parameter is None.")
+        if not isinstance(observations, set) and not isinstance(observations, list):
+            print("The parameter observations need to be a list or a set.")
+        if not all(isinstance(observation, DefaultEntity) for observation in observations):
+            print("Not all observations in the observations set/list are instance of the DefaultEntity class.")
         elif parameters_to_update is None:
             print("The parameters_to_update parameter is None.")
+        elif not isinstance(parameters_to_update, dict):
+            print("The parameter parameters_to_update need to be a dictionary.")
+        if not all(isinstance(parameters, dict) for parameters in parameters_to_update.values()):
+            print("Not all the value of the parameter parameters_to_update are dictionary.")
         else:
             result = {}
             for observation in observations:
-                result[hash(observation)] = ObservationFunctions.update_observation_on_server(
-                    observation, parameters_to_update[hash(observation)], gateway_manager)
+                if hash(observation) in parameters_to_update:
+                    result[hash(observation)] = ObservationFunctions.update_observation_on_server(
+                        observation, parameters_to_update[hash(observation)], gateway_manager)
 
         return result
 
@@ -418,19 +437,17 @@ class ObservationFunctions:
     def update_observations_on_server_from_dir(observations_dir_path, gateway_manager):
         result = None
 
-        parameters_to_update = {}
-        observations_to_update = []
         observations = ObservationFunctions.get_observations_from_dir(observations_dir_path)
 
-        if observations is None:
+        if not isinstance(observations, set) and not isinstance(observations, list):
             print("Can't find any observation in the passed directory.")
         else:
+            parameters_to_update = {}
+
             for observation in observations:
                 parameters_to_update[hash(observation)] = copy.deepcopy(observation.get_parameters())
-                observations_to_update.append(observation)
 
-        if len(observations_to_update) > 0:
-            result = ObservationFunctions.update_observations_on_server(observations_to_update, parameters_to_update,
+            result = ObservationFunctions.update_observations_on_server(observations, parameters_to_update,
                                                                         gateway_manager)
 
         return result
@@ -442,7 +459,7 @@ class ObservationFunctions:
     # This function adds the passed observation in the database, if it is not already present.
     @staticmethod
     def delete_observation_on_server(observation, gateway_manager):
-        result = None
+        result = False
 
         if not isinstance(gateway_manager, GatewayManager):
             print("You need to provide a gateway_manager to connect with the service REST API.")
@@ -466,6 +483,10 @@ class ObservationFunctions:
 
         if observations is None:
             print("The observations parameter is None.")
+        if not isinstance(observations, set) and not isinstance(observations, list):
+            print("The parameter observations need to be a set or a list.")
+        if not all(isinstance(observation, DefaultEntity) for observation in observations):
+            print("Not all the observations in observations parameter are instance of the class DefaultEntity.")
         else:
             result = {}
             for observation in observations:

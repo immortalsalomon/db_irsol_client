@@ -160,7 +160,7 @@ class EntityManager:
                 print("There is not a default gateway for the entry point passed in the gateway manager.")
             else:
                 entity = default_gateway.get_by_id(id_entity, self.__gateway_manager.get_authenticate_gateway())
-                if entity is not None:
+                if entity is not None and len(entity) > 0:
                     to_return = DefaultEntity(entry_point)
                     to_return.set_parameters(entity[0], True)
                 else:
@@ -233,7 +233,7 @@ class EntityManager:
             else:
                 entities = default_gateway.get_chunk_by_parameters(start_element_number, number_of_elements, parameters,
                                                                    self.__gateway_manager.get_authenticate_gateway())
-                if entities is not None:
+                if entities is not None and len(entities) > 0:
                     to_return = set()
                     for entity in entities:
                         current_entity = DefaultEntity(entry_point)
@@ -286,6 +286,9 @@ class EntityManager:
             if server_entity is not None:
                 if len(server_entity) > 1:
                     print("Found more then one possible entity on the server. Impossible to know on what synchronize.")
+                elif len(server_entity) == 0:
+                    print("The program was not able to find the passed entity in the database."
+                          " Are you sure that the entity is in the database")
                 else:
                     default_entity.clear_parameters()
                     default_entity.set_parameters(server_entity[0], True)
